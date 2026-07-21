@@ -57,11 +57,11 @@ jobs:
       - name: SonarCloud Analysis
         working-directory: orchestrator
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_TOKEN: afb4e556a6feae73acae7dee37d3d736c8d8e840
         run: |
           mvn sonar:sonar \
-            -Dsonar.projectKey=RonnyGuilhermes_medflow-backend \
-            -Dsonar.organization=ronnyguilhermes \
+            -Dsonar.projectKey=RonnyGuilherme_medflow-backend \
+            -Dsonar.organization=ronnyguilherme \
             -Dsonar.host.url=https://sonarcloud.io
 
       - name: Upload test results
