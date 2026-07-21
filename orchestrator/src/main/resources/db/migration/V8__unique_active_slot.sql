@@ -17,5 +17,7 @@ CREATE UNIQUE INDEX idx_appointments_active_slot
     WHERE status IN ('SCHEDULED', 'CONFIRMED');
 
 COMMENT ON INDEX idx_appointments_active_slot IS
-    'Partial unique index: enforces one active appointment per slot per tenant. ' ||
-    'SCHEDULED and CONFIRMED statuses share the slot; CANCELLED/COMPLETED do not.';
+    'Partial unique index:
+    Enforces one active appointment per slot per tenant.
+    SCHEDULED and CONFIRMED statuses share the slot.
+    CANCELLED and COMPLETED do not.';
