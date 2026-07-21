@@ -119,10 +119,16 @@ class OutboxRelayServiceTest {
         service.relay();
 
         // DB must NOT be updated: event stays unpublished for next poll
-        verify(outboxEventRepository, never()).save(any());
-        assertThat(event.getPublishedAt())
-                .as("publishedAt must stay null so the event is retried on next poll")
-                .isNull();
+        ArgumentCaptor<OutboxEvent> captor = ArgumentCaptor.forClass(OutboxEvent.class);
+
+        verify(outboxEventRepository).save(captor.capture());
+
+        OutboxEvent saved = captor.getValue();
+
+        assertThat(saved.getPublishedAt()).isNull();
+        assertThat(saved.getAttemptCount()).isEqualTo(1);
+        assertThat(saved.getNextRetryAt()).isNotNull();
+        assertThat(saved.getLastError()).contains("Broker error");
     }
 
     // ── Test 3: INDEPENDENT FAILURE ISOLATION ────────────────────────────────
@@ -151,7 +157,28 @@ class OutboxRelayServiceTest {
         service.relay();
 
         // Only event1 saved; event2 stays unpublished for retry
-        verify(outboxEventRepository, times(1)).save(any());
+        ArgumentCaptor<OutboxEvent> captor = ArgumentCaptor.forClass(OutboxEvent.class);
+        verify(outboxEventRepository, times(2)).save(captor.capture());
+
+        List<OutboxEvent> saved = captor.getAllValues();
+
+        // Filtra cada evento de forma explícita pelo ID
+        OutboxEvent published = saved.stream()
+                .filter(e -> e.getId().equals(event1.getId()))
+                .findFirst()
+                .orElseThrow();
+
+        OutboxEvent failed = saved.stream()
+                .filter(e -> e.getId().equals(event2.getId()))
+                .findFirst()
+                .orElseThrow();
+
+        // Asserções para o evento de SUCESSO (event1)
+        assertThat(published.getPublishedAt()).isNotNull();
+
+        // Asserções para o evento de FALHA (event2)
+        assertThat(failed.getPublishedAt()).isNull();
+        assertThat(failed.getAttemptCount()).isEqualTo(1);
     }
 
     // ── Test 4: EMPTY BATCH ───────────────────────────────────────────────────
