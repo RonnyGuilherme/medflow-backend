@@ -1,0 +1,237 @@
+{
+  "title": "MedFlow \u2014 Service Overview",
+  "uid": "medflow-overview",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "tags": [
+    "medflow",
+    "microservices"
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Appointments Created (per minute)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "rate(medflow_appointments_created_total[1m]) * 60",
+          "legendFormat": "Appointments/min"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Appointments Cancelled (per minute)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "rate(medflow_appointments_cancelled_total[1m]) * 60",
+          "legendFormat": "Cancellations/min"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Outbox \u2014 Published Events Rate",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "rate(medflow_outbox_published_total[1m]) * 60",
+          "legendFormat": "Published/min"
+        },
+        {
+          "expr": "rate(medflow_outbox_failed_total[1m]) * 60",
+          "legendFormat": "Failed/min"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Orchestrator \u2014 HTTP Request Latency (p95)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{application='orchestrator'}[5m])) by (le, uri))",
+          "legendFormat": "p95 {{uri}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Availability Check Latency (p95)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(medflow_availability_check_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95 availability check"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "JVM Heap Usage",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "jvm_memory_used_bytes{application='orchestrator', area='heap'}",
+          "legendFormat": "Heap Used"
+        },
+        {
+          "expr": "jvm_memory_max_bytes{application='orchestrator', area='heap'}",
+          "legendFormat": "Heap Max"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "Go Goroutines (Availability Engine)",
+      "type": "stat",
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "go_goroutines{job='availability-engine'}",
+          "legendFormat": "Goroutines"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Active HTTP Requests (Orchestrator)",
+      "type": "stat",
+      "gridPos": {
+        "x": 6,
+        "y": 24,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "sum(http_server_requests_seconds_count{application='orchestrator', status!~'5..'})",
+          "legendFormat": "Requests"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "5xx Error Rate",
+      "type": "stat",
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{application='orchestrator', status=~'5..'}[5m]))",
+          "legendFormat": "5xx/s"
+        }
+      ],
+      "options": {
+        "thresholds": {
+          "steps": [
+            {
+              "color": "green",
+              "value": null
+            },
+            {
+              "color": "red",
+              "value": 0.1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": 10,
+      "title": "GC Average Pause Duration (s)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 18,
+        "y": 24,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "rate(jvm_gc_pause_seconds_sum{application='orchestrator'}[5m]) / rate(jvm_gc_pause_seconds_count{application='orchestrator'}[5m])",
+          "legendFormat": "GC {{action}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      }
+    }
+  ]
+}

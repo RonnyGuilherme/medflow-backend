@@ -1,0 +1,35 @@
+global:
+  scrape_interval:     15s
+  evaluation_interval: 15s
+  external_labels:
+    environment: development
+    project:     medflow
+
+scrape_configs:
+
+  # Orchestrator — Spring Boot Actuator Prometheus endpoint
+  - job_name: orchestrator
+    static_configs:
+      - targets: ['orchestrator:8080']
+    metrics_path: /actuator/prometheus
+    scrape_interval: 10s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: orchestrator
+
+  # Availability Engine — Go Prometheus endpoint
+  - job_name: availability-engine
+    static_configs:
+      - targets: ['availability-engine:8081']
+    metrics_path: /metrics
+    scrape_interval: 10s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: availability-engine
+
+  # Prometheus self-monitoring
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']

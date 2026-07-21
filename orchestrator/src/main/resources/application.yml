@@ -1,0 +1,106 @@
+spring:
+  application:
+    name: orchestrator
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/medflow}
+    username: ${SPRING_DATASOURCE_USERNAME:medflow}
+    password: ${SPRING_DATASOURCE_PASSWORD:secret}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      pool-name: MedFlowHikariPool
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+        default_schema: public
+    show-sql: false
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: false
+    locations: classpath:db/migration
+    validate-on-migrate: true
+
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: orchestrator-group
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      retries: 5
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 1
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+
+server:
+  port: 8080
+  tomcat:
+    threads:
+      virtual:
+        enabled: true   # Project Loom — Virtual Threads (Java 21)
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics,flyway
+  endpoint:
+    health:
+      show-details: when_authorized
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    export:
+      prometheus:
+        enabled: true
+
+availability:
+  engine:
+    url: ${AVAILABILITY_ENGINE_URL:http://localhost:8081}
+    connect-timeout-ms: 2000
+    read-timeout-ms: 5000
+
+medflow:
+  outbox:
+    relay-interval-ms: 1000
+    batch-size: 100
+  kafka:
+    dlq-topic: ${KAFKA_DLQ_TOPIC:medflow.appointments.dlq}
+  jwt:
+    secret: ${JWT_SECRET:dev-secret-key-minimum-256-bits-long-for-hs256-algorithm}
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui/index.html
+    operations-sorter: method
+
+logging:
+  pattern:
+    console: '{"timestamp":"%d{yyyy-MM-dd HH:mm:ss.SSS}","level":"%p","service":"orchestrator","tenant":"%X{tenantId}","correlation":"%X{correlationId}","logger":"%logger{36}","message":"%m"}%n'
+  level:
+    com.medflow: INFO
+    org.springframework: WARN
+    org.hibernate: WARN

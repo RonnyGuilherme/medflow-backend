@@ -1,0 +1,42 @@
+# Environment
+.env
+*.env.local
+
+# Java / Maven
+orchestrator/target/
+orchestrator/*.class
+orchestrator/.mvn/wrapper/maven-wrapper.jar
+**/.classpath
+**/.project
+**/.settings/
+**/out/
+
+# Go
+availability-engine/bin/
+availability-engine/*.exe
+*.test
+
+# Node.js
+notification-dispatcher/node_modules/
+notification-dispatcher/dist/
+notification-dispatcher/coverage/
+npm-debug.log*
+yarn-error.log*
+
+# Docker
+.docker/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# OS
+Thumbs.db
