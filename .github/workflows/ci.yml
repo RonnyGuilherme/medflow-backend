@@ -101,6 +101,8 @@ jobs:
         with:
           working-directory: availability-engine
           version: latest
+          skip-pkg-cache: true
+          skip-build-cache: true
 
       - name: Run tests (with race detector)
         working-directory: availability-engine
