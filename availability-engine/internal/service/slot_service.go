@@ -81,14 +81,14 @@ func (s *SlotService) HandleAppointmentCreated(
 		return err
 	}
 	if !booked {
-		// Slot was already taken by another appointment. This is a retryable failure.
-		// The consumer will retry up to maxRetries times, then route to DLQ.
-		slog.Warn("Slot booking conflict — will retry",
-			"slotId", event.SlotID,
-			"appointmentId", event.AppointmentID,
-			"tenantId", event.TenantID)
-		return ErrSlotAlreadyBooked
-	}
+        // Deterministic conflict — the slot is permanently occupied by another appointment.
+        // ErrSlotAlreadyBooked signals the consumer to route to DLQ immediately, no retries.
+        slog.Warn("Slot booking conflict — routing to DLQ immediately",
+            "slotId", event.SlotID,
+            "appointmentId", event.AppointmentID,
+            "tenantId", event.TenantID)
+        return ErrSlotAlreadyBooked
+    }
 	slog.Info("Slot marked as BOOKED",
 		"slotId", event.SlotID,
 		"appointmentId", event.AppointmentID,

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"time"
+	"strconv"
 
 	"github.com/RonnyGuilherme/medflow-backend/availability-engine/internal/model"
 	"github.com/RonnyGuilherme/medflow-backend/availability-engine/internal/service"
@@ -140,7 +141,7 @@ func (c *AppointmentConsumer) processWithRetry(ctx context.Context, msg kafka.Me
 	}
 	return nil
 }
-    func (c *AppointmentConsumer) process(ctx context.Context, msg kafka.Message) error {
+func (c *AppointmentConsumer) process(ctx context.Context, msg kafka.Message) error {
     	eventType := headerValue(msg.Headers, "eventType")
     	if eventType == "" {
     		var partial map[string]string
