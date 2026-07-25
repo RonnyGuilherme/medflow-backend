@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
-	"time"
 	"strconv"
+	"time"
 
 	"github.com/RonnyGuilherme/medflow-backend/availability-engine/internal/model"
 	"github.com/RonnyGuilherme/medflow-backend/availability-engine/internal/service"
@@ -142,47 +142,47 @@ func (c *AppointmentConsumer) processWithRetry(ctx context.Context, msg kafka.Me
 	return nil
 }
 func (c *AppointmentConsumer) process(ctx context.Context, msg kafka.Message) error {
-    	eventType := headerValue(msg.Headers, "eventType")
-    	if eventType == "" {
-    		var partial map[string]string
-    		if jsonErr := json.Unmarshal(msg.Value, &partial); jsonErr != nil {
-    			slog.Debug("Could not parse payload for event type inference", "offset", msg.Offset)
-    		}
-    		statusToEventType := map[string]string{
-    			"SCHEDULED": "appointment.created",
-    			"CONFIRMED": "appointment.created",
-    			"CANCELLED": "appointment.cancelled",
-    			"COMPLETED": "appointment.completed",
-    			"NO_SHOW":   "appointment.no_show",
-    		}
-    		eventType = statusToEventType[partial["status"]]
-    	}
+	eventType := headerValue(msg.Headers, "eventType")
+	if eventType == "" {
+		var partial map[string]string
+		if jsonErr := json.Unmarshal(msg.Value, &partial); jsonErr != nil {
+			slog.Debug("Could not parse payload for event type inference", "offset", msg.Offset)
+		}
+		statusToEventType := map[string]string{
+			"SCHEDULED": "appointment.created",
+			"CONFIRMED": "appointment.created",
+			"CANCELLED": "appointment.cancelled",
+			"COMPLETED": "appointment.completed",
+			"NO_SHOW":   "appointment.no_show",
+		}
+		eventType = statusToEventType[partial["status"]]
+	}
 
-    	slog.Debug("Processing Kafka message",
-    		"offset", msg.Offset,
-    		"key", string(msg.Key),
-    		"eventType", eventType)
+	slog.Debug("Processing Kafka message",
+		"offset", msg.Offset,
+		"key", string(msg.Key),
+		"eventType", eventType)
 
-    	switch eventType {
-    	case "appointment.created":
-    		var event model.AppointmentCreatedEvent
-    		if err := json.Unmarshal(msg.Value, &event); err != nil {
-    			return err
-    		}
-    		return c.svc.HandleAppointmentCreated(ctx, &event)
+	switch eventType {
+	case "appointment.created":
+		var event model.AppointmentCreatedEvent
+		if err := json.Unmarshal(msg.Value, &event); err != nil {
+			return err
+		}
+		return c.svc.HandleAppointmentCreated(ctx, &event)
 
-    	case "appointment.cancelled":
-    		var event model.AppointmentCreatedEvent
-    		if err := json.Unmarshal(msg.Value, &event); err != nil {
-    			return err
-    		}
-    		return c.svc.HandleAppointmentCancelled(ctx, &event)
+	case "appointment.cancelled":
+		var event model.AppointmentCreatedEvent
+		if err := json.Unmarshal(msg.Value, &event); err != nil {
+			return err
+		}
+		return c.svc.HandleAppointmentCancelled(ctx, &event)
 
-    	default:
-    		slog.Debug("Skipping unknown event type", "eventType", eventType)
-    		return nil
-    	}
-    }
+	default:
+		slog.Debug("Skipping unknown event type", "eventType", eventType)
+		return nil
+	}
+}
 
 // routeToDLQ sends a failure notification to the DLQ.
 func (c *AppointmentConsumer) routeToDLQ(
@@ -217,7 +217,7 @@ func (c *AppointmentConsumer) routeToDLQ(
 		Value: payload,
 		Headers: []kafka.Header{
 			{Key: "originalOffset", Value: []byte(strconv.FormatInt(msg.Offset, 10))},
-            {Key: "originalTopic",  Value: []byte(msg.Topic)},
+			{Key: "originalTopic", Value: []byte(msg.Topic)},
 			{Key: "reason", Value: []byte(err.Error())},
 		},
 	}
