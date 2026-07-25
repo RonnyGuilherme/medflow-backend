@@ -5,10 +5,11 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/google/uuid"
+
 	"github.com/RonnyGuilherme/medflow-backend/availability-engine/internal/model"
 	"github.com/RonnyGuilherme/medflow-backend/availability-engine/internal/repository"
 	"github.com/RonnyGuilherme/medflow-backend/availability-engine/internal/service"
-	"github.com/google/uuid"
 )
 
 // ── Mock repository (satisfies SlotRepositoryPort) ────────────────────────────
