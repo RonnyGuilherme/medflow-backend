@@ -80,7 +80,6 @@ func (r *SlotRepository) MarkBooked(ctx context.Context, slotID, tenantID uuid.U
 		SET status = 'BOOKED', updated_at = NOW()
 		WHERE id = $1 AND tenant_id = $2 AND status = 'AVAILABLE'
 	`, slotID, tenantID)
-
 	if err != nil {
 		return false, err
 	}
