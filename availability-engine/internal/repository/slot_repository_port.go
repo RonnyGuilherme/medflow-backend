@@ -3,8 +3,9 @@ package repository
 import (
 	"context"
 
-	"github.com/RonnyGuilherme/medflow-backend/availability-engine/internal/model"
 	"github.com/google/uuid"
+
+	"github.com/RonnyGuilherme/medflow-backend/availability-engine/internal/model"
 )
 
 // SlotRepositoryPort is the interface that SlotService depends on.

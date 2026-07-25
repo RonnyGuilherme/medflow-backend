@@ -4,10 +4,11 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/RonnyGuilherme/medflow-backend/availability-engine/internal/model"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/RonnyGuilherme/medflow-backend/availability-engine/internal/model"
 )
 
 type SlotRepository struct {

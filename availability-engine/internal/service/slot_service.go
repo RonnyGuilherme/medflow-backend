@@ -5,9 +5,10 @@ import (
 	"errors"
 	"log/slog"
 
+	"github.com/google/uuid"
+
 	"github.com/RonnyGuilherme/medflow-backend/availability-engine/internal/model"
 	"github.com/RonnyGuilherme/medflow-backend/availability-engine/internal/repository"
-	"github.com/google/uuid"
 )
 
 // ErrSlotAlreadyBooked is a deterministic conflict: the slot is permanently occupied.
