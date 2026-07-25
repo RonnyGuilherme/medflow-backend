@@ -57,7 +57,7 @@ jobs:
       - name: SonarCloud Analysis
         working-directory: orchestrator
         env:
-          SONAR_TOKEN: afb4e556a6feae73acae7dee37d3d736c8d8e840
+          SONAR_TOKEN: 7bb530aa630f3d2f00369a555a4627ee299789d0
         run: |
           mvn sonar:sonar \
             -Dsonar.projectKey=RonnyGuilherme_medflow-backend \
