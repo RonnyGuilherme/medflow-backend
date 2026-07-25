@@ -9,14 +9,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"github.com/RonnyGuilherme/medflow-backend/availability-engine/internal/config"
 	"github.com/RonnyGuilherme/medflow-backend/availability-engine/internal/consumer"
 	"github.com/RonnyGuilherme/medflow-backend/availability-engine/internal/database"
 	"github.com/RonnyGuilherme/medflow-backend/availability-engine/internal/handler"
 	"github.com/RonnyGuilherme/medflow-backend/availability-engine/internal/repository"
 	"github.com/RonnyGuilherme/medflow-backend/availability-engine/internal/service"
-	"github.com/gin-gonic/gin"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {

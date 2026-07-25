@@ -8,9 +8,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/segmentio/kafka-go"
+
 	"github.com/RonnyGuilherme/medflow-backend/availability-engine/internal/model"
 	"github.com/RonnyGuilherme/medflow-backend/availability-engine/internal/service"
-	"github.com/segmentio/kafka-go"
 )
 
 // AppointmentConsumer reads from medflow.appointments and updates slot state.
