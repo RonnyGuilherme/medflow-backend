@@ -8,13 +8,13 @@ import (
 )
 
 type Config struct {
-	Port           string
-	DatabaseURL    string
-	KafkaBrokers   []string // slice — supports comma-separated multi-broker addresses
-	KafkaTopic     string
-	KafkaGroupID   string
-	KafkaDLQTopic  string   // Dead Letter Queue topic for failed booking events
-	ConsumerMaxRetries int   // Maximum retries before routing to DLQ (default: 5)
+	Port               string
+	DatabaseURL        string
+	KafkaBrokers       []string // slice — supports comma-separated multi-broker addresses
+	KafkaTopic         string
+	KafkaGroupID       string
+	KafkaDLQTopic      string // Dead Letter Queue topic for failed booking events
+	ConsumerMaxRetries int    // Maximum retries before routing to DLQ (default: 5)
 }
 
 func Load() *Config {
@@ -26,12 +26,12 @@ func Load() *Config {
 	}
 
 	cfg := &Config{
-		Port:           getEnv("PORT", "8081"),
-		DatabaseURL:    getEnv("DATABASE_URL", "postgres://medflow:secret@localhost:5432/medflow?sslmode=disable"),
-		KafkaBrokers:   getEnvSlice("KAFKA_BROKERS", "localhost:9092"),
-		KafkaTopic:     getEnv("KAFKA_TOPIC", "medflow.appointments"),
-		KafkaGroupID:   getEnv("KAFKA_GROUP_ID", "availability-engine-group"),
-		KafkaDLQTopic:  getEnv("KAFKA_DLQ_TOPIC", "medflow.appointments.dlq"),
+		Port:               getEnv("PORT", "8081"),
+		DatabaseURL:        getEnv("DATABASE_URL", "postgres://medflow:secret@localhost:5432/medflow?sslmode=disable"),
+		KafkaBrokers:       getEnvSlice("KAFKA_BROKERS", "localhost:9092"),
+		KafkaTopic:         getEnv("KAFKA_TOPIC", "medflow.appointments"),
+		KafkaGroupID:       getEnv("KAFKA_GROUP_ID", "availability-engine-group"),
+		KafkaDLQTopic:      getEnv("KAFKA_DLQ_TOPIC", "medflow.appointments.dlq"),
 		ConsumerMaxRetries: maxRetries,
 	}
 
