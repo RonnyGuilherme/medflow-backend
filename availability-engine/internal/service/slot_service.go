@@ -80,15 +80,15 @@ func (s *SlotService) HandleAppointmentCreated(
 	if err != nil {
 		return err
 	}
-	if !booked {
-        // Deterministic conflict — the slot is permanently occupied by another appointment.
-        // ErrSlotAlreadyBooked signals the consumer to route to DLQ immediately, no retries.
-        slog.Warn("Slot booking conflict — routing to DLQ immediately",
-            "slotId", event.SlotID,
-            "appointmentId", event.AppointmentID,
-            "tenantId", event.TenantID)
-        return ErrSlotAlreadyBooked
-    }
+		if !booked {
+    		// Deterministic conflict — the slot is permanently occupied by another appointment.
+    		// ErrSlotAlreadyBooked signals the consumer to route to DLQ immediately, no retries.
+    		slog.Warn("Slot booking conflict — routing to DLQ immediately",
+    			"slotId", event.SlotID,
+    			"appointmentId", event.AppointmentID,
+    			"tenantId", event.TenantID)
+    		return ErrSlotAlreadyBooked
+    	}
 	slog.Info("Slot marked as BOOKED",
 		"slotId", event.SlotID,
 		"appointmentId", event.AppointmentID,
