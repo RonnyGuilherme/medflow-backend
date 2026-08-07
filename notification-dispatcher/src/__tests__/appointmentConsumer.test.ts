@@ -1,17 +1,46 @@
-import { AppointmentEvent } from '../types/appointment';
+import { AppointmentConsumer } from '../consumer/appointmentConsumer';
+import type { AppointmentEvent, AppointmentStatus } from '../types/appointment';
 
-// ── Shared mock factories ──────────────────────────────────────────────────
+// ── Mocks ─────────────────────────────────────────────────────────────────────
 
-const makeEmailNotifier = (overrides: Partial<Record<string, jest.Mock>> = {}) => ({
-  sendAppointmentCreated:   overrides['created']   ?? jest.fn().mockResolvedValue(undefined),
-  sendAppointmentCancelled: overrides['cancelled'] ?? jest.fn().mockResolvedValue(undefined),
-  verifyConnection:         jest.fn().mockResolvedValue(undefined),
-});
+jest.mock('../logger', () => ({
+  logger: { info: jest.fn(), debug: jest.fn(), warn: jest.fn(), error: jest.fn() },
+}));
 
-const makePushNotifier = (overrides: Partial<Record<string, jest.Mock>> = {}) => ({
-  sendAppointmentCreated:   overrides['created']   ?? jest.fn().mockResolvedValue(undefined),
-  sendAppointmentCancelled: overrides['cancelled'] ?? jest.fn().mockResolvedValue(undefined),
-});
+const mockKafkaConsumer = {
+  connect:    jest.fn().mockResolvedValue(undefined),
+  subscribe:  jest.fn().mockResolvedValue(undefined),
+  run:        jest.fn().mockResolvedValue(undefined),
+  disconnect: jest.fn().mockResolvedValue(undefined),
+};
+
+jest.mock('kafkajs', () => ({
+  Kafka: jest.fn().mockImplementation(() => ({
+    consumer: jest.fn().mockReturnValue(mockKafkaConsumer),
+  })),
+}));
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+const { Kafka } = jest.requireMock('kafkajs');
+
+const makeConsumer = (emailOverrides = {}, pushOverrides = {}) => {
+  const email = {
+    sendAppointmentCreated:   jest.fn().mockResolvedValue(undefined),
+    sendAppointmentCancelled: jest.fn().mockResolvedValue(undefined),
+    verifyConnection:         jest.fn().mockResolvedValue(undefined),
+    ...emailOverrides,
+  };
+  const push = {
+    sendAppointmentCreated:   jest.fn().mockResolvedValue(undefined),
+    sendAppointmentCancelled: jest.fn().mockResolvedValue(undefined),
+    ...pushOverrides,
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const consumer = new AppointmentConsumer(new Kafka({}), 'test-group', email as any, push as any);
+  return { consumer, email, push };
+};
 
 const sampleEvent: AppointmentEvent = {
   appointmentId:  '550e8400-e29b-41d4-a716-446655440001',
@@ -23,129 +52,277 @@ const sampleEvent: AppointmentEvent = {
   occurredAt:     new Date().toISOString(),
 };
 
-// ── Test suite ────────────────────────────────────────────────────────────────
+// ── Tests ─────────────────────────────────────────────────────────────────────
 
-describe('AppointmentConsumer — dispatch logic', () => {
+describe('AppointmentConsumer', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  // ── Happy paths ──────────────────────────────────────────────────────────
+  describe('start', () => {
+    it('connects consumer and subscribes to topic', async () => {
+      const {consumer} = makeConsumer();
+      await consumer.start('medflow.appointments');
 
-  it('dispatches email AND push in parallel for appointment.created', async () => {
-    const email = makeEmailNotifier();
-    const push  = makePushNotifier();
+      expect(mockKafkaConsumer.connect).toHaveBeenCalledTimes(1);
+      expect(mockKafkaConsumer.subscribe).toHaveBeenCalledWith({
+        topic: 'medflow.appointments',
+        fromBeginning: false,
+      });
+      expect(mockKafkaConsumer.run).toHaveBeenCalledTimes(1);
+    });
 
-    // Simulate the dispatch call directly
-    await Promise.allSettled([
-      email.sendAppointmentCreated(sampleEvent),
-      push.sendAppointmentCreated(sampleEvent),
-    ]);
+    it('processes a valid message end-to-end via eachMessage callback', async () => {
+      const {consumer, email} = makeConsumer();
 
-    expect(email.sendAppointmentCreated).toHaveBeenCalledTimes(1);
-    expect(push.sendAppointmentCreated).toHaveBeenCalledTimes(1);
-    expect(email.sendAppointmentCreated).toHaveBeenCalledWith(sampleEvent);
+      let eachMessage!: (payload: any) => Promise<void>;
+      mockKafkaConsumer.run.mockImplementationOnce(async ({eachMessage: fn}: any) => {
+        eachMessage = fn;
+      });
+
+      await consumer.start('medflow.appointments');
+
+      await eachMessage({
+        topic: 'medflow.appointments',
+        partition: 0,
+        message: {
+          value: Buffer.from(JSON.stringify(sampleEvent)),
+          headers: {eventType: Buffer.from('appointment.created')},
+          offset: '0',
+        },
+        heartbeat: jest.fn(),
+        pause: jest.fn(),
+      });
+
+      expect(email.sendAppointmentCreated).toHaveBeenCalledWith(
+          expect.objectContaining({appointmentId: sampleEvent.appointmentId}),
+      );
+    });
+
+    it('skips processing when message value is null', async () => {
+      const {consumer, email} = makeConsumer();
+
+      let eachMessage!: (payload: any) => Promise<void>;
+      mockKafkaConsumer.run.mockImplementationOnce(async ({eachMessage: fn}: any) => {
+        eachMessage = fn;
+      });
+
+      await consumer.start('medflow.appointments');
+
+      await eachMessage({
+        topic: 'medflow.appointments',
+        partition: 0,
+        message: {value: null, headers: {}, offset: '0'},
+        heartbeat: jest.fn(),
+        pause: jest.fn(),
+      });
+
+      expect(email.sendAppointmentCreated).not.toHaveBeenCalled();
+    });
+
+    it('skips duplicate events — deduplication cache prevents double delivery', async () => {
+      const {consumer, email} = makeConsumer();
+
+      let eachMessage!: (payload: any) => Promise<void>;
+      mockKafkaConsumer.run.mockImplementationOnce(async ({eachMessage: fn}: any) => {
+        eachMessage = fn;
+      });
+
+      await consumer.start('medflow.appointments');
+
+      const message = {
+        topic: 'medflow.appointments',
+        partition: 0,
+        message: {
+          value: Buffer.from(JSON.stringify(sampleEvent)),
+          headers: {eventType: Buffer.from('appointment.created')},
+          offset: '0',
+        },
+        heartbeat: jest.fn(),
+        pause: jest.fn(),
+      };
+
+      await eachMessage(message);   // primeira entrega — processa
+      await eachMessage(message);   // segunda entrega — dedup ignora
+
+      expect(email.sendAppointmentCreated).toHaveBeenCalledTimes(1); // só uma vez
+    });
+
+    it('logs error and returns when message is not valid JSON', async () => {
+      const {consumer, email} = makeConsumer();
+
+      let eachMessage!: (payload: any) => Promise<void>;
+      mockKafkaConsumer.run.mockImplementationOnce(async ({eachMessage: fn}: any) => {
+        eachMessage = fn;
+      });
+
+      await consumer.start('medflow.appointments');
+
+      await eachMessage({
+        topic: 'medflow.appointments',
+        partition: 0,
+        message: {
+          value: Buffer.from('not-valid-json'),
+          headers: {eventType: Buffer.from('appointment.created')},
+          offset: '0',
+        },
+        heartbeat: jest.fn(),
+        pause: jest.fn(),
+      });
+
+      expect(email.sendAppointmentCreated).not.toHaveBeenCalled();
+    });
   });
 
-  it('dispatches cancellation notifications for appointment.cancelled', async () => {
-    const email = makeEmailNotifier();
-    const push  = makePushNotifier();
+  describe('dispatch — happy paths', () => {
+    it('sends email AND push in parallel for appointment.created', async () => {
+      const {consumer, email, push} = makeConsumer();
+      await (consumer as any).dispatch('appointment.created', sampleEvent);
 
-    await Promise.allSettled([
-      email.sendAppointmentCancelled(sampleEvent),
-      push.sendAppointmentCancelled(sampleEvent),
-    ]);
+      expect(email.sendAppointmentCreated).toHaveBeenCalledWith(sampleEvent);
+      expect(push.sendAppointmentCreated).toHaveBeenCalledWith(sampleEvent);
+      expect(email.sendAppointmentCreated).toHaveBeenCalledTimes(1);
+    });
 
-    expect(email.sendAppointmentCancelled).toHaveBeenCalledTimes(1);
-    expect(push.sendAppointmentCancelled).toHaveBeenCalledTimes(1);
+    it('sends cancellation to both channels for appointment.cancelled', async () => {
+      const {consumer, email, push} = makeConsumer();
+      const cancelled: AppointmentEvent = {...sampleEvent, status: 'CANCELLED' as AppointmentStatus};
+      await (consumer as any).dispatch('appointment.cancelled', cancelled);
+
+      expect(email.sendAppointmentCancelled).toHaveBeenCalledWith(cancelled);
+      expect(push.sendAppointmentCancelled).toHaveBeenCalledWith(cancelled);
+    });
+
+    it('does not throw when only email fails — partial delivery acceptable', async () => {
+      const {consumer} = makeConsumer({
+        sendAppointmentCreated: jest.fn().mockRejectedValue(new Error('SMTP timeout')),
+      });
+      await expect(
+          (consumer as any).dispatch('appointment.created', sampleEvent),
+      ).resolves.toBeUndefined();
+    });
+
+    it('does not throw when only push fails — partial delivery acceptable', async () => {
+      const {consumer} = makeConsumer({}, {
+        sendAppointmentCreated: jest.fn().mockRejectedValue(new Error('FCM 503')),
+      });
+      await expect(
+          (consumer as any).dispatch('appointment.created', sampleEvent),
+      ).resolves.toBeUndefined();
+    });
   });
 
-  // ── Bug #4 fix: both channels fail → throw ──────────────────────────────
-
-  it('throws when BOTH channels fail — preventing event from being deduped', async () => {
-    // Both channels reject
-    const emailFail = jest.fn().mockRejectedValue(new Error('SMTP timeout'));
-    const pushFail  = jest.fn().mockRejectedValue(new Error('FCM 503'));
-
-    const [emailResult, pushResult] = await Promise.allSettled([
-      emailFail(sampleEvent),
-      pushFail(sampleEvent),
-    ]);
-
-    const emailFailed = emailResult.status === 'rejected';
-    const pushFailed  = pushResult.status  === 'rejected';
-
-    // Verify the throw condition (mirrors dispatch() implementation)
-    expect(emailFailed && pushFailed).toBe(true);
-
-    // Simulate what dispatch() does: throw when both fail
-    const dispatchThrows = async (): Promise<void> => {
-      if (emailFailed && pushFailed) {
-        throw new Error(
-          `Both notification channels failed for appointment ${sampleEvent.appointmentId}`,
-        );
-      }
-    };
-
-    await expect(dispatchThrows()).rejects.toThrow('Both notification channels failed');
+  describe('dispatch — both channels fail', () => {
+    it('throws when BOTH channels fail', async () => {
+      const {consumer} = makeConsumer(
+          {sendAppointmentCreated: jest.fn().mockRejectedValue(new Error('SMTP timeout'))},
+          {sendAppointmentCreated: jest.fn().mockRejectedValue(new Error('FCM 503'))},
+      );
+      await expect(
+          (consumer as any).dispatch('appointment.created', sampleEvent),
+      ).rejects.toThrow('Both notification channels failed');
+    });
   });
 
-  it('does NOT throw when only email fails — push success is acceptable partial delivery', async () => {
-    const emailFail   = jest.fn().mockRejectedValue(new Error('SMTP timeout'));
-    const pushSuccess = jest.fn().mockResolvedValue(undefined);
+  describe('processMessage — error handling', () => {
+    it('rethrows when both channels fail during message processing', async () => {
+      const {consumer} = makeConsumer(
+          {
+            sendAppointmentCreated: jest.fn().mockRejectedValue(new Error('SMTP')),
+          },
+          {
+            sendAppointmentCreated: jest.fn().mockRejectedValue(new Error('FCM')),
+          },
+      );
 
-    const [emailResult, pushResult] = await Promise.allSettled([
-      emailFail(sampleEvent),
-      pushSuccess(sampleEvent),
-    ]);
+      let eachMessage!: (payload: any) => Promise<void>;
 
-    const emailFailed = emailResult.status === 'rejected';
-    const pushFailed  = pushResult.status  === 'rejected';
+      mockKafkaConsumer.run.mockImplementationOnce(async ({eachMessage: fn}: any) => {
+        eachMessage = fn;
+      });
 
-    // Only email failed — should NOT throw
-    expect(emailFailed).toBe(true);
-    expect(pushFailed).toBe(false);
+      await consumer.start('medflow.appointments');
 
-    // dispatch() should resolve (no throw) when only one channel fails
-    const dispatchResult = async (): Promise<void> => {
-      if (emailFailed && pushFailed) {
-        throw new Error('Both channels failed');
-      }
-      // Partial failure is acceptable — event IS added to dedup set
-    };
-
-    await expect(dispatchResult()).resolves.toBeUndefined();
+      await expect(
+          eachMessage({
+            topic: 'medflow.appointments',
+            partition: 0,
+            message: {
+              value: Buffer.from(JSON.stringify(sampleEvent)),
+              headers: {
+                eventType: Buffer.from('appointment.created'),
+              },
+              offset: '0',
+            },
+            heartbeat: jest.fn(),
+            pause: jest.fn(),
+          }),
+      ).rejects.toThrow('Both notification channels failed');
+    });
   });
 
-  it('does NOT throw when only push fails — email success is acceptable partial delivery', async () => {
-    const emailSuccess = jest.fn().mockResolvedValue(undefined);
-    const pushFail     = jest.fn().mockRejectedValue(new Error('FCM 503'));
+  describe('dispatchEmail', () => {
+    it('ignores unknown email event', async () => {
+      const {consumer, email} = makeConsumer();
 
-    const [emailResult, pushResult] = await Promise.allSettled([
-      emailSuccess(sampleEvent),
-      pushFail(sampleEvent),
-    ]);
+      await (consumer as any).dispatchEmail(
+          'appointment.xyz',
+          sampleEvent,
+      );
 
-    const emailFailed = emailResult.status === 'rejected';
-    const pushFailed  = pushResult.status  === 'rejected';
-
-    expect(emailFailed).toBe(false);
-    expect(pushFailed).toBe(true);
-    expect(emailFailed && pushFailed).toBe(false);
+      expect(email.sendAppointmentCreated).not.toHaveBeenCalled();
+      expect(email.sendAppointmentCancelled).not.toHaveBeenCalled();
+    });
   });
 
-  // ── Event type inference ──────────────────────────────────────────────────
+  describe('dispatchPush', () => {
+    it('ignores unknown push event', async () => {
+      const {consumer, push} = makeConsumer();
 
-  it('infers event type from status when Kafka header is missing', () => {
-    const statusMap: Record<string, string> = {
-      SCHEDULED: 'appointment.created',
-      CANCELLED: 'appointment.cancelled',
-      CONFIRMED: 'appointment.confirmed',
-      COMPLETED: 'appointment.completed',
-    };
+      await (consumer as any).dispatchPush(
+          'appointment.xyz',
+          sampleEvent,
+      );
 
-    expect(statusMap['SCHEDULED']).toBe('appointment.created');
-    expect(statusMap['CANCELLED']).toBe('appointment.cancelled');
-    expect(statusMap['CONFIRMED']).toBe('appointment.confirmed');
-    expect(statusMap['COMPLETED']).toBe('appointment.completed');
-    expect(statusMap['UNKNOWN']).toBeUndefined(); // no default mapping
+      expect(push.sendAppointmentCreated).not.toHaveBeenCalled();
+      expect(push.sendAppointmentCancelled).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('inferEventType', () => {
+    it.each([
+      ['SCHEDULED', 'appointment.created'],
+      ['CANCELLED', 'appointment.cancelled'],
+      ['CONFIRMED', 'appointment.confirmed'],
+      ['COMPLETED', 'appointment.completed'],
+    ])('maps %s correctly', (status, expected) => {
+      const {consumer} = makeConsumer();
+
+      const result = (consumer as any).inferEventType({
+        ...sampleEvent,
+        status,
+      });
+
+      expect(result).toBe(expected);
+    });
+
+    it('returns unknown for unsupported status', () => {
+      const {consumer} = makeConsumer();
+
+      const result = (consumer as any).inferEventType({
+        ...sampleEvent,
+        status: 'WHATEVER',
+      });
+
+      expect(result).toBe('appointment.unknown');
+    });
+  });
+
+  describe('shutdown', () => {
+    it('disconnects kafka consumer', async () => {
+      const {consumer} = makeConsumer();
+
+      await consumer.shutdown();
+
+      expect(mockKafkaConsumer.disconnect).toHaveBeenCalledTimes(1);
+    });
   });
 });
