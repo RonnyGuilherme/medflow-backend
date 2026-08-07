@@ -93,6 +93,10 @@ export class AppointmentConsumer {
     }
   }
 
+  /**
+   * Exposed for unit testing.
+   * Internal consumers should use start().
+   */
   private async dispatch(eventType: string, event: AppointmentEvent): Promise<void> {
     const [emailResult, pushResult] = await Promise.allSettled([
       this.dispatchEmail(eventType, event),
@@ -100,11 +104,12 @@ export class AppointmentConsumer {
     ]);
 
     const emailFailed = emailResult.status === 'rejected';
-    const pushFailed  = pushResult.status  === 'rejected';
+    const pushFailed = pushResult.status === 'rejected';
 
     if (emailFailed) {
       logger.error({ msg: 'Email dispatch failed', error: emailResult.reason });
     }
+
     if (pushFailed) {
       logger.error({ msg: 'Push dispatch failed', error: pushResult.reason });
     }
@@ -114,33 +119,55 @@ export class AppointmentConsumer {
     // If only one channel fails, we accept partial delivery (better than no delivery).
     if (emailFailed && pushFailed) {
       throw new Error(
-        `Both notification channels failed for appointment ${event.appointmentId}`,
+          `Both notification channels failed for appointment ${event.appointmentId}`,
       );
     }
   }
 
-  private async dispatchEmail(eventType: string, event: AppointmentEvent): Promise<void> {
+  /**
+   * Exposed for unit testing.
+   * Internal consumers should use dispatch().
+   */
+  private async dispatchEmail(
+      eventType: string,
+      event: AppointmentEvent,
+  ): Promise<void> {
     switch (eventType) {
       case 'appointment.created':
         return this.emailNotifier.sendAppointmentCreated(event);
+
       case 'appointment.cancelled':
         return this.emailNotifier.sendAppointmentCancelled(event);
+
       default:
         logger.debug({ msg: 'No email handler for event type', eventType });
     }
   }
 
-  private async dispatchPush(eventType: string, event: AppointmentEvent): Promise<void> {
+  /**
+   * Exposed for unit testing.
+   * Internal consumers should use dispatch().
+   */
+  private async dispatchPush(
+      eventType: string,
+      event: AppointmentEvent,
+  ): Promise<void> {
     switch (eventType) {
       case 'appointment.created':
         return this.pushNotifier.sendAppointmentCreated(event);
+
       case 'appointment.cancelled':
         return this.pushNotifier.sendAppointmentCancelled(event);
+
       default:
         logger.debug({ msg: 'No push handler for event type', eventType });
     }
   }
 
+  /**
+   * Exposed for unit testing.
+   * Internal consumers should rely on Kafka event headers whenever available.
+   */
   private inferEventType(event: AppointmentEvent): string {
     const statusMap: Record<string, string> = {
       SCHEDULED: 'appointment.created',
@@ -148,6 +175,7 @@ export class AppointmentConsumer {
       CONFIRMED: 'appointment.confirmed',
       COMPLETED: 'appointment.completed',
     };
+
     return statusMap[event.status] ?? 'appointment.unknown';
   }
 
