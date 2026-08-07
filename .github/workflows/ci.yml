@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main, develop]
 
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+  issues: read
+
 env:
   JAVA_VERSION: '21'
   GO_VERSION:   '1.22'
@@ -57,12 +63,15 @@ jobs:
       - name: SonarCloud Analysis
         working-directory: orchestrator
         env:
-          SONAR_TOKEN: 7bb530aa630f3d2f00369a555a4627ee299789d0
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           mvn sonar:sonar \
             -Dsonar.projectKey=RonnyGuilherme_medflow-backend \
             -Dsonar.organization=ronnyguilherme \
             -Dsonar.host.url=https://sonarcloud.io
+            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml,target/site/jacoco-it/jacoco.xml \
+            -Dsonar.java.coveragePlugin=jacoco
 
       - name: Upload test results
         if: always()
