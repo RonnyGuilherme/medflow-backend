@@ -5,7 +5,7 @@ const config: Config = {
   testEnvironment: 'node',
   roots: ['<rootDir>/src'],
   testMatch: ['**/__tests__/**/*.test.ts'],
-  collectCoverageFrom: ['src/**/*.ts', '!src/index.ts', '!src/notifier/**', '!src/config/**', '!src/logger.ts'],
+  collectCoverageFrom: ['src/**/*.ts', '!src/index.ts', '!src/logger.ts'],
   coverageThreshold: {
     global: { lines: 80, functions: 80, branches: 70 }
   },
