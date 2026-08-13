@@ -28,7 +28,10 @@ describe('EmailNotifier', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
-        (nodemailer.createTransport as jest.Mock).mockReturnValue({ sendMail, verify });
+        (nodemailer.createTransport as jest.Mock).mockReturnValue({
+            sendMail,
+            verify,
+        });
     });
 
     it('sends a booking confirmation with the derived recipient, subject and appointment details', async () => {
@@ -41,9 +44,9 @@ describe('EmailNotifier', () => {
             expect.objectContaining({
                 from: 'noreply@medflow.io',
                 to: 'patient-patient-1@example.com',
-                subject: expect.stringContaining('booked'),
-                html: expect.stringContaining(EVENT.appointmentId),
-            })
+                subject: expect.stringContaining('booked') as unknown,
+                html: expect.stringContaining(EVENT.appointmentId) as unknown,
+            }),
         );
     });
 
@@ -55,9 +58,9 @@ describe('EmailNotifier', () => {
 
         expect(sendMail).toHaveBeenCalledWith(
             expect.objectContaining({
-                subject: expect.stringContaining('cancelled'),
-                html: expect.stringContaining(EVENT.appointmentId),
-            })
+                subject: expect.stringContaining('cancelled') as unknown,
+                html: expect.stringContaining(EVENT.appointmentId) as unknown,
+            }),
         );
     });
 
@@ -65,19 +68,28 @@ describe('EmailNotifier', () => {
         sendMail.mockRejectedValue(new Error('SMTP connection refused'));
         const notifier = new EmailNotifier(SMTP_CONFIG);
 
-        await expect(notifier.sendAppointmentCreated(EVENT)).rejects.toThrow('SMTP connection refused');
+        await expect(
+            notifier.sendAppointmentCreated(EVENT),
+        ).rejects.toThrow('SMTP connection refused');
     });
 
     it('never logs the recipient email address (GDPR: patientEmail is intentionally omitted)', async () => {
         sendMail.mockResolvedValue(undefined);
-        const infoSpy = jest.spyOn(logger, 'info').mockImplementation(() => undefined as never);
+
+        const infoSpy = jest
+            .spyOn(logger, 'info')
+            .mockImplementation(() => undefined as never);
+
         const notifier = new EmailNotifier(SMTP_CONFIG);
 
         await notifier.sendAppointmentCreated(EVENT);
 
         expect(infoSpy).toHaveBeenCalled();
+
         const loggedPayload = JSON.stringify(infoSpy.mock.calls[0]);
+
         expect(loggedPayload).not.toContain('@example.com');
+
         infoSpy.mockRestore();
     });
 
@@ -86,6 +98,7 @@ describe('EmailNotifier', () => {
         const notifier = new EmailNotifier(SMTP_CONFIG);
 
         await expect(notifier.verifyConnection()).resolves.toBeUndefined();
+
         expect(verify).toHaveBeenCalledTimes(1);
     });
 });
