@@ -41,12 +41,12 @@ describe('PushNotifier', () => {
             await notifier().sendAppointmentCreated(EVENT);
 
             expect(fetchMock).toHaveBeenCalledTimes(1);
-            const [url, options] = fetchMock.mock.calls[0];
+            const [url, options] = fetchMock.mock.calls[0] as [string, { method: string; headers: Record<string, string>; body: string }];
             expect(url).toBe('https://fcm.googleapis.com/fcm/send');
             expect(options.method).toBe('POST');
             expect(options.headers['Authorization']).toBe('key=real-server-key');
 
-            const body = JSON.parse(options.body);
+            const body = JSON.parse(options.body) as { to: string; data: { type: string; appointmentId: string } };
             expect(body.to).toBe(`/topics/patient-${EVENT.patientId}`);
             expect(body.data.type).toBe('appointment.created');
             expect(body.data.appointmentId).toBe(EVENT.appointmentId);
@@ -57,8 +57,8 @@ describe('PushNotifier', () => {
 
             await notifier().sendAppointmentCancelled(EVENT);
 
-            const [, options] = fetchMock.mock.calls[0];
-            const body = JSON.parse(options.body);
+            const [, options] = fetchMock.mock.calls[0] as [string, { body: string }];
+            const body = JSON.parse(options.body) as { data: { type: string }; notification: { title: string } };
             expect(body.data.type).toBe('appointment.cancelled');
             expect(body.notification.title).toBe('Appointment Cancelled');
         });
@@ -68,9 +68,9 @@ describe('PushNotifier', () => {
 
             await notifier().sendAppointmentCreated(EVENT);
 
-            const [, options] = fetchMock.mock.calls[0];
-            const body = JSON.parse(options.body);
-            expect(Object.keys(body.data).sort()).toEqual(['appointmentId', 'type']);
+            const [, options] = fetchMock.mock.calls[0] as [string, { body: string }];
+            const body = JSON.parse(options.body) as Record<string, unknown>;
+            expect(Object.keys(body.data as Record<string, unknown>).sort()).toEqual(['appointmentId', 'type']);
         });
 
         it('throws with the FCM status and response body when the request is not OK', async () => {

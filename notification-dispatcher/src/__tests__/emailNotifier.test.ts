@@ -38,7 +38,7 @@ describe('EmailNotifier', () => {
         await notifier.sendAppointmentCreated(EVENT);
 
         expect(sendMail).toHaveBeenCalledTimes(1);
-        const mail = sendMail.mock.calls[0][0];
+        const mail = sendMail.mock.calls[0]?.[0] as { from: string; to: string; subject: string; html: string };
         expect(mail.from).toBe('noreply@medflow.io');
         expect(mail.to).toBe('patient-patient-1@example.com');
         expect(mail.subject).toContain('booked');
@@ -53,7 +53,7 @@ describe('EmailNotifier', () => {
         await notifier.sendAppointmentCancelled(EVENT);
 
         expect(sendMail).toHaveBeenCalledTimes(1);
-        const mail = sendMail.mock.calls[0][0];
+        const mail = sendMail.mock.calls[0]?.[0] as { subject: string; html: string };
         expect(mail.subject).toContain('cancelled');
         expect(mail.html).toContain(EVENT.appointmentId);
     });
