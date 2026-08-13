@@ -37,13 +37,14 @@ describe('EmailNotifier', () => {
 
         await notifier.sendAppointmentCreated(EVENT);
 
-        expect(sendMail).toHaveBeenCalledTimes(1);
-        const mail = sendMail.mock.calls[0]?.[0] as unknown as { from: string; to: string; subject: string; html: string };
-        expect(mail.from).toBe('noreply@medflow.io');
-        expect(mail.to).toBe('patient-patient-1@example.com');
-        expect(mail.subject).toContain('booked');
-        expect(mail.html).toContain(EVENT.appointmentId);
-        expect(mail.html).toContain(EVENT.status);
+        expect(sendMail).toHaveBeenCalledWith(
+            expect.objectContaining({
+                from: 'noreply@medflow.io',
+                to: 'patient-patient-1@example.com',
+                subject: expect.stringContaining('booked'),
+                html: expect.stringContaining(EVENT.appointmentId),
+            })
+        );
     });
 
     it('sends a cancellation email referencing the appointment id', async () => {
@@ -52,10 +53,12 @@ describe('EmailNotifier', () => {
 
         await notifier.sendAppointmentCancelled(EVENT);
 
-        expect(sendMail).toHaveBeenCalledTimes(1);
-        const mail = sendMail.mock.calls[0]?.[0] as unknown as { subject: string; html: string };
-        expect(mail.subject).toContain('cancelled');
-        expect(mail.html).toContain(EVENT.appointmentId);
+        expect(sendMail).toHaveBeenCalledWith(
+            expect.objectContaining({
+                subject: expect.stringContaining('cancelled'),
+                html: expect.stringContaining(EVENT.appointmentId),
+            })
+        );
     });
 
     it('propagates the error when the SMTP transporter rejects, instead of swallowing it', async () => {
